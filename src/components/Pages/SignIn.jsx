@@ -46,6 +46,10 @@ export default function SignIn() {
     try {
       const response = await apiService.post("/api/v1/users/signIn", user);
       if (response.status === 200) {
+        localStorage.setItem(
+          "auth-token",
+          response.data?.user?.authenticationToken
+        );
         toast.success("User Successfully Signed In");
         navigate("/dashboard");
       }
