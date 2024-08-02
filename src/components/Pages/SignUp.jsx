@@ -1,23 +1,74 @@
-import * as React from "react";
-import Avatar from "@mui/material/Avatar";
-import Button from "@mui/material/Button";
-import CssBaseline from "@mui/material/CssBaseline";
-import TextField from "@mui/material/TextField";
-import Link from "@mui/material/Link";
-import Paper from "@mui/material/Paper";
-import Box from "@mui/material/Box";
-import Grid from "@mui/material/Grid";
-import Typography from "@mui/material/Typography";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
+import React, { useRef, useState, useEffect } from "react";
+import {
+  Avatar,
+  Button,
+  CssBaseline,
+  TextField,
+  Link,
+  Paper,
+  Box,
+  Grid,
+  Typography,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  createTheme,
+  ThemeProvider,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import apiService from "../../services/ApiService";
 import toast from "react-hot-toast";
+import * as faceapi from "face-api.js";
 
 const defaultTheme = createTheme();
 
 export default function SignUp() {
   const navigate = useNavigate();
-  const [errors, setErrors] = React.useState({});
+  const [errors, setErrors] = useState({});
+  const [faceArray, setFaceArray] = useState([]);
+  const [open, setOpen] = useState(false);
+  const videoRef = useRef();
+  const streamRef = useRef();
+
+  console.log(faceArray);
+
+  const loadModels = async () => {
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri("/models"),
+      faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
+      faceapi.nets.faceRecognitionNet.loadFromUri("/models"),
+    ]);
+  };
+
+  const handleVideoPlay = async () => {
+    const detections = await faceapi
+      .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+    if (detections.length > 0) {
+      const descriptors = detections.map((face) => Array.from(face.descriptor));
+      setFaceArray(descriptors[0]); // Assuming you want to use the first detected face
+      toast.success("Face data captured successfully.");
+      handleClose();
+    } else {
+      toast.error("No face detected. Please try again.");
+    }
+  };
+
+  const startVideo = () => {
+    navigator.mediaDevices.getUserMedia({ video: {} }).then((stream) => {
+      streamRef.current = stream;
+      videoRef.current.srcObject = stream;
+    });
+  };
+
+  const stopVideo = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -30,30 +81,18 @@ export default function SignUp() {
       department: data.get("department"),
       company: data.get("company"),
       password: data.get("password"),
+      faceArray: faceArray,
     };
 
     let newErrors = {};
-    if (!user.email) {
-      newErrors.email = "Email is required";
-    }
-    if (!user.firstName) {
-      newErrors.firstName = "First name is required";
-    }
-    if (!user.lastName) {
-      newErrors.lastName = "Last name is required";
-    }
-    if (!user.employeeNo) {
-      newErrors.employeeNo = "Employee No is required";
-    }
-    if (!user.department) {
-      newErrors.department = "Department is required";
-    }
-    if (!user.company) {
-      newErrors.company = "Company is required";
-    }
-    if (!user.password) {
-      newErrors.password = "Password is required";
-    }
+    if (!user.email) newErrors.email = "Email is required";
+    if (!user.firstName) newErrors.firstName = "First name is required";
+    if (!user.lastName) newErrors.lastName = "Last name is required";
+    if (!user.employeeNo) newErrors.employeeNo = "Employee No is required";
+    if (!user.department) newErrors.department = "Department is required";
+    if (!user.company) newErrors.company = "Company is required";
+    if (!user.password) newErrors.password = "Password is required";
+    if (!user.faceArray.length) newErrors.faceArray = "Face data is required";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -71,6 +110,20 @@ export default function SignUp() {
         error.response?.data?.message || "Something went wrong";
       toast.error(`${errorMessage}`);
     }
+  };
+
+  useEffect(() => {
+    loadModels();
+  }, []);
+
+  const handleClickOpen = () => {
+    setOpen(true);
+    startVideo();
+  };
+
+  const handleClose = () => {
+    stopVideo();
+    setOpen(false);
   };
 
   return (
@@ -200,6 +253,14 @@ export default function SignUp() {
                 </Grid>
               </Grid>
               <Button
+                onClick={handleClickOpen}
+                fullWidth
+                variant="contained"
+                sx={{ mt: 3, mb: 2 }}
+              >
+                Capture Face Data
+              </Button>
+              <Button
                 type="submit"
                 fullWidth
                 variant="contained"
@@ -222,6 +283,20 @@ export default function SignUp() {
           </Box>
         </Grid>
       </Grid>
+      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+        <DialogTitle>Capture Face Data</DialogTitle>
+        <DialogContent>
+          <video ref={videoRef} autoPlay style={{ width: "100%" }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose} color="secondary">
+            Cancel
+          </Button>
+          <Button onClick={handleVideoPlay} color="primary">
+            Capture
+          </Button>
+        </DialogActions>
+      </Dialog>
     </ThemeProvider>
   );
 }
