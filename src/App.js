@@ -4,11 +4,11 @@ import SignUp from "./components/Pages/SignUp";
 import { useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import apiService from "./services/ApiService";
-import Layout from "./Layout";
 import { Toaster } from "react-hot-toast";
 import ForgotPassword from "./components/Pages/ForgotPassword";
 import VerifyOtp from "./components/Pages/verifyOtp";
 import ChangePassword from "./components/Pages/ChangePassword";
+import Dashboard from "./components/Pages/Dashboard";
 
 function App() {
   const navigate = useNavigate();
@@ -41,8 +41,8 @@ function App() {
         <Route path="/verifyOtp" element={<VerifyOtp />} />
         <Route path="/changePassword" element={<ChangePassword />} />
         {isUser && (
-          <Route element={<Layout />}>
-            {/* <Route path="/dashboard" element={<Dashboard />} /> */}
+          <Route>
+            <Route path="/dashboard" element={<Dashboard />} />
           </Route>
         )}
       </Routes>

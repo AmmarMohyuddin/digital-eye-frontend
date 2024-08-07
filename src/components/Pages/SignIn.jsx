@@ -21,6 +21,7 @@ const defaultTheme = createTheme();
 export default function SignIn() {
   const navigate = useNavigate();
   const [errors, setErrors] = useState({});
+  const [user, setUser] = useState();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -50,8 +51,9 @@ export default function SignIn() {
           "auth-token",
           response.data?.user?.authenticationToken
         );
+        setUser(response.data?.user)
         toast.success("User Successfully Signed In");
-        navigate("/dashboard");
+        navigate("/dashboard", {state: {user: user}});
       }
     } catch (error) {
       const errorMessage = "Invalid Credentials";
