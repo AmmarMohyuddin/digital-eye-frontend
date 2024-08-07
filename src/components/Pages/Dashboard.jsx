@@ -78,14 +78,24 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
 const defaultTheme = createTheme();
 
 export default function Dashboard() {
+  const location = useLocation();
+  const { user } = location.state || {};
   const [open, setOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [faceArray, setFaceArray] = useState([]);
+  const [status, setStatus] = useState("");
   const videoRef = useRef();
   const streamRef = useRef();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { email } = location.state.user || {};
+
+  useEffect(() => {
+  if (user?.attendance?.length > 0) {
+    setStatus(user.attendance[0].status.toString());
+  } else {
+    setStatus("");
+  }
+}, [user]);
+  
 
   useEffect(() => {
     const loadModels = async () => {
@@ -130,8 +140,8 @@ export default function Dashboard() {
 
         // Prepare the data to send
         const params = {
-          email: email,
-          checkInStatus: "check-in",
+          email: user.email,
+          checkInStatus: status,
           faceArray: faceArray,
         };
 
@@ -139,7 +149,8 @@ export default function Dashboard() {
         try {
           const response = await apiService.post('/api/v1/users/markAttendence', params);
           if (response.status === 200) {
-            toast.success('You are checked in today');
+            toast.success(status === "checkIn" ? 'You are checked in today' : 'You are checked out today');
+            setStatus(status === "checkIn" ? "checkOut" : "checkIn");
           }
         } catch (error) {
           const errorMessage = error?.response?.data?.message || 'Something went wrong';
@@ -265,7 +276,7 @@ export default function Dashboard() {
                     variant="contained"
                     sx={{ mt: 3, mb: 2 }}
                   >
-                    Check In
+                    {status === "checkIn" ? "Check In" : "Check Out"}
                   </Button>
                 </Paper>
               </Grid>

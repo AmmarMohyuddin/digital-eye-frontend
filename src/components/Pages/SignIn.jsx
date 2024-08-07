@@ -21,21 +21,20 @@ const defaultTheme = createTheme();
 export default function SignIn() {
   const navigate = useNavigate();
   const [errors, setErrors] = useState({});
-  const [user, setUser] = useState();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const user = {
+    const credentials = {
       email: data.get("email"),
       password: data.get("password"),
     };
 
     let newErrors = {};
-    if (!user.email) {
+    if (!credentials.email) {
       newErrors.email = "Email is required";
     }
-    if (!user.password) {
+    if (!credentials.password) {
       newErrors.password = "Password is required";
     }
 
@@ -45,21 +44,19 @@ export default function SignIn() {
     }
 
     try {
-      const response = await apiService.post("/api/v1/users/signIn", user);
+      const response = await apiService.post("/api/v1/users/signIn", credentials);
       if (response.status === 200) {
-        localStorage.setItem(
-          "auth-token",
-          response.data?.user?.authenticationToken
-        );
-        setUser(response.data?.user)
+        const userData = response.data?.user;
+        localStorage.setItem("auth-token", userData?.authenticationToken);
         toast.success("User Successfully Signed In");
-        navigate("/dashboard", {state: {user: user}});
+        navigate("/dashboard", { state: { user: userData } });
       }
     } catch (error) {
       const errorMessage = "Invalid Credentials";
       toast.error(`${errorMessage}`);
     }
   };
+
   return (
     <ThemeProvider theme={defaultTheme}>
       <Grid container component="main" sx={{ height: "100vh" }}>
@@ -107,7 +104,7 @@ export default function SignIn() {
                 name="email"
                 autoComplete="email"
                 autoFocus
-                error={errors.email}
+                error={Boolean(errors.email)}
                 helperText={errors.email}
               />
               <TextField
@@ -119,7 +116,7 @@ export default function SignIn() {
                 type="password"
                 id="password"
                 autoComplete="current-password"
-                error={errors.password}
+                error={Boolean(errors.password)}
                 helperText={errors.password}
               />
               <FormControlLabel
