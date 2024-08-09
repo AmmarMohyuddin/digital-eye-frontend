@@ -1,4 +1,4 @@
-import * as React from "react";
+import React, { useContext } from "react";
 import Avatar from "@mui/material/Avatar";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -14,12 +14,14 @@ import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import apiService from "../../services/ApiService";
+import { AuthContext } from "../../context/AuthContext";
 import { useState } from "react";
 
 const defaultTheme = createTheme();
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const { setUser } = useContext(AuthContext);
   const [errors, setErrors] = useState({});
 
   const handleSubmit = async (event) => {
@@ -46,10 +48,11 @@ export default function SignIn() {
     try {
       const response = await apiService.post("/api/v1/users/signIn", credentials);
       if (response.status === 200) {
-        const userData = response.data?.user;
+        const userData = response?.data?.user;
         localStorage.setItem("auth-token", userData?.authenticationToken);
-        toast.success("User Successfully Signed In");
-        navigate("/dashboard", { state: { user: userData } });
+        setUser(userData);
+        toast.success(response?.data?.message);
+        navigate("/dashboard");
       }
     } catch (error) {
       const errorMessage = "Invalid Credentials";

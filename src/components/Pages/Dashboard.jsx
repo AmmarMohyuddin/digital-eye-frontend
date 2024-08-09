@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useContext } from 'react';
 import { styled, createTheme, ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import MuiDrawer from '@mui/material/Drawer';
@@ -25,9 +25,10 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import * as faceapi from 'face-api.js';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import apiService from '../../services/ApiService';
+import { AuthContext } from "../../context/AuthContext";
 
 const drawerWidth = 240;
 
@@ -78,24 +79,39 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
 const defaultTheme = createTheme();
 
 export default function Dashboard() {
-  const location = useLocation();
-  const { user } = location.state || {};
+  const { user, setUser } = useContext(AuthContext);
   const [open, setOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [faceArray, setFaceArray] = useState([]);
-  const [status, setStatus] = useState("");
+  const [faceArray, setFaceArray] = useState();
+  const [status, setStatus] = useState(user?.attendances[0]?.status || "checkIn");
+  const [checkOutStatus, setCheckOutStatus] = useState(user?.attendances[1]?.status || "checkOut");
   const videoRef = useRef();
   const streamRef = useRef();
   const navigate = useNavigate();
 
   useEffect(() => {
-  if (user?.attendance?.length > 0) {
-    setStatus(user.attendance[0].status.toString());
-  } else {
-    setStatus("");
-  }
-}, [user]);
-  
+    const checkToken = async () => {
+      const token = localStorage.getItem('auth-token');
+      if (token) {
+        try {
+          const response = await apiService.get('/api/v1/users/verifyToken', {
+            headers: { authorization: token }
+          });
+          if (response.status === 200) {
+            const userData = response.data.user;
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+          } else {
+            toast.error('Failed to fetch user data');
+          }
+        } catch (error) {
+          toast.error(error?.response?.data?.message || 'Error verifying token');
+        }
+      }
+    };
+
+    checkToken();
+  }, [setUser]);
 
   useEffect(() => {
     const loadModels = async () => {
@@ -109,16 +125,24 @@ export default function Dashboard() {
     loadModels();
   }, []);
 
+  useEffect(() => {
+    if (user) {
+      setStatus(user.attendances[0]?.status || "checkIn");
+    }
+  }, [user]);
+
   const handleDrawerToggle = () => {
     setDrawerOpen(!drawerOpen);
   };
 
   const handleSignOut = () => {
     localStorage.removeItem('auth-token');
+    localStorage.removeItem('user');
     navigate('/signIn');
   };
 
-  const handleClickOpen = () => {
+  const handleClickOpen = (newStatus) => {
+    setStatus(newStatus);  // Update the status based on button clicked
     setOpen(true);
     startVideo();
   };
@@ -134,18 +158,17 @@ export default function Dashboard() {
         .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptors();
+
       if (detections.length > 0) {
         const descriptors = detections.map((face) => Array.from(face.descriptor));
         setFaceArray(descriptors[0]);
 
-        // Prepare the data to send
         const params = {
-          email: user.email,
+          email: user?.email,
           checkInStatus: status,
-          faceArray: faceArray,
+          faceArray: descriptors[0],
         };
 
-        // Make the API request
         try {
           const response = await apiService.post('/api/v1/users/markAttendence', params);
           if (response.status === 200) {
@@ -153,8 +176,7 @@ export default function Dashboard() {
             setStatus(status === "checkIn" ? "checkOut" : "checkIn");
           }
         } catch (error) {
-          const errorMessage = error?.response?.data?.message || 'Something went wrong';
-          toast.error(`${errorMessage}`);
+          toast.error(error?.response?.data?.message || 'Something went wrong');
         }
 
         handleClose();
@@ -179,6 +201,16 @@ export default function Dashboard() {
       streamRef.current = null;
     }
   };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString(undefined, options);
+  };
+
+  // Safeguard against user being null or undefined
+  const checkInDate = user?.attendances[0]?.date ? new Date(user.attendances[0].date) : null;
+  const checkOutDate = user?.attendances[1]?.date ? new Date(user.attendances[1].date) : null;
 
   return (
     <ThemeProvider theme={defaultTheme}>
@@ -270,13 +302,34 @@ export default function Dashboard() {
                     alignItems: 'center',
                   }}
                 >
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    CheckIn Time: {checkInDate ? checkInDate.toLocaleTimeString() : 'N/A'}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mb: 2 }}>
+                    CheckIn Date: {checkInDate ? formatDate(checkInDate) : 'N/A'}
+                  </Typography>
                   <Button
-                    onClick={handleClickOpen}
+                    onClick={() => handleClickOpen("checkIn")} // Pass "checkIn" status
                     fullWidth
+                    disabled={status === "checkIn"}
                     variant="contained"
-                    sx={{ mt: 3, mb: 2 }}
+                    sx={{ mb: 2 }}
                   >
-                    {status === "checkIn" ? "Check In" : "Check Out"}
+                    Check In
+                  </Button>
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    CheckOut Time: {checkOutDate ? checkOutDate.toLocaleTimeString() : 'N/A'}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mb: 2 }}>
+                    CheckOut Date: {checkOutDate ? formatDate(checkOutDate) : 'N/A'}
+                  </Typography>
+                  <Button
+                    onClick={() => handleClickOpen("checkOut")} // Pass "checkOut" status
+                    fullWidth
+                    disabled={checkOutStatus === "checkOut"}
+                    variant="contained"
+                  >
+                    Check Out
                   </Button>
                 </Paper>
               </Grid>
